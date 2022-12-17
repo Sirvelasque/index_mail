@@ -2,21 +2,17 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
-	"strings"
+	"path/filepath"
 )
 
 func main() {
 	fmt.Println("working")
-	path := os.Args[1]
-	bytes, err := os.ReadFile(path)
+	root := os.Args[1]
+	err := filepath.Walk(root, visit)
 	if err != nil {
-		fmt.Println(err)
-		return
+		fmt.Printf("error walking the path %q: %v\n", root, err)
 	}
-	fmt.Println("folder path", path)
-	fmt.Println("file content", string(bytes))
 
 }
 

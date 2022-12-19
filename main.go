@@ -24,7 +24,6 @@ func main() {
 	if err != nil {
 		fmt.Printf("error walking the path %q: %v\n", root, err)
 	}
-	fmt.Println(Mails)
 
 }
 
@@ -40,7 +39,6 @@ func visit(path string, info os.FileInfo, err error) error {
 
 func appendInfo(path string) {
 
-	data := Email{}
 	content, err := os.ReadFile(path)
 	if err != nil {
 		fmt.Printf("error reading file: %v\n", err)
@@ -48,31 +46,30 @@ func appendInfo(path string) {
 	}
 
 	lines := strings.Split(string(content), "\n")
-
+	var MessageID string
+	var From string
+	var To string
+	var Subject string
 	for _, line := range lines {
 		key, obj := asignLine(line)
 		if key != "" {
 			// fmt.Println(line)
 			switch key {
 			case "MessageID":
-				data.MessageID = obj
+				MessageID = obj
 			case "From":
-				data.From = obj
+				From = obj
 			case "To":
-				data.To = obj
+				To = obj
 			case "Subject":
-				data.Subject = obj
+				Subject = obj
 			default:
 				continue
 			}
 
 		}
 	}
-	fmt.Println("DATA : \n", data)
-	{
-		pushData(data)
-	}
-	fmt.Println("MAILS \n", Mails)
+	pushData(createMail(MessageID, From, To, Subject))
 }
 
 func asignLine(line string) (string, string) {
@@ -104,4 +101,13 @@ func getKey(line string) string {
 
 func pushData(data Email) {
 	Mails = append(Mails, data)
+}
+
+func createMail(MessageID string, From string, To string, Subject string) Email {
+	return Email{
+		MessageID: MessageID,
+		From:      From,
+		To:        To,
+		Subject:   Subject,
+	}
 }

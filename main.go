@@ -24,7 +24,6 @@ func main() {
 	if err != nil {
 		fmt.Printf("error walking the path %q: %v\n", root, err)
 	}
-
 }
 
 func visit(path string, info os.FileInfo, err error) error {
@@ -50,10 +49,10 @@ func appendInfo(path string) {
 	var From string
 	var To string
 	var Subject string
+	var Content string
 	for _, line := range lines {
 		key, obj := asignLine(line)
 		if key != "" {
-			// fmt.Println(line)
 			switch key {
 			case "MessageID":
 				MessageID = obj
@@ -63,13 +62,16 @@ func appendInfo(path string) {
 				To = obj
 			case "Subject":
 				Subject = obj
-			default:
+			case "Content":
+				Content = getMessage(string(content), obj)
 				continue
+			default:
+
 			}
 
 		}
 	}
-	pushData(createMail(MessageID, From, To, Subject))
+	pushData(createMail(MessageID, From, To, Subject, Content))
 }
 
 func asignLine(line string) (string, string) {
@@ -78,16 +80,37 @@ func asignLine(line string) (string, string) {
 	switch getKey(line) {
 	case "Message-ID:":
 		key = "MessageID"
-		obj = strings.Split(line, " ")[1]
+		if len(strings.Split(line, " ")) > 1 {
+			obj = strings.Split(line, " ")[1]
+		} else {
+			obj = ""
+		}
 	case "From:":
 		key = "From"
-		obj = strings.Split(line, " ")[1]
+		if len(strings.Split(line, " ")) > 1 {
+			obj = strings.Split(line, " ")[1]
+		} else {
+			obj = ""
+		}
 	case "To:":
 		key = "To"
-		obj = strings.Split(line, " ")[1]
+		if len(strings.Split(line, " ")) > 1 {
+			obj = strings.Split(line, " ")[1]
+		} else {
+			obj = ""
+		}
 	case "Subject:":
 		key = "Subject"
-		obj = strings.Join(strings.Split(line, " ")[1:], " ")
+		if len(strings.Split(line, " ")) > 2 {
+			obj = line[9:]
+		} else {
+			obj = ""
+		}
+
+	case "X-FileName:":
+		key = "Content"
+		words := strings.Split(line, " ")
+		obj = words[len(words)-1]
 	default:
 		key = ""
 		obj = ""
@@ -99,15 +122,24 @@ func getKey(line string) string {
 	return strings.Split(line, " ")[0]
 }
 
+func getMessage(content string, obj string) string {
+	pos := strings.Index(content, obj)
+	if pos == -1 {
+		return "Oops! something went wrong getting the message content"
+	}
+	return content[pos+21:]
+}
+
 func pushData(data Email) {
 	Mails = append(Mails, data)
 }
 
-func createMail(MessageID string, From string, To string, Subject string) Email {
+func createMail(MessageID string, From string, To string, Subject string, Content string) Email {
 	return Email{
 		MessageID: MessageID,
 		From:      From,
 		To:        To,
 		Subject:   Subject,
+		Content:   Content,
 	}
 }

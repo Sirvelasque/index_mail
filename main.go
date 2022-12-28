@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -28,28 +27,8 @@ func main() {
 	if err != nil {
 		fmt.Printf("error walking the path %q: %v\n", root, err)
 	}
-	// upone()
-	// createIndex()
+
 	bulkEmails()
-	url := "http://localhost:4080/api/index_name?name=f"
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		fmt.Println(err)
-	}
-	req.SetBasicAuth("admin", "Complexpass#123")
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		fmt.Println(err)
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	fmt.Println(string(body))
 }
 
 func visit(path string, info os.FileInfo, err error) error {
@@ -186,29 +165,6 @@ func bulkEmails() {
 		return
 	}
 	req, erreq := http.NewRequest("POST", bulkUrl, bytes.NewBuffer(jsonMails))
-	if erreq != nil {
-		fmt.Println(erreq)
-	}
-	req.SetBasicAuth("admin", "Complexpass#123")
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Println("res error: ", err)
-		return
-	}
-	defer resp.Body.Close()
-	fmt.Println(resp.StatusCode)
-}
-
-func upone() {
-	bulkUrl := "http://localhost:4080/api/mails/_doc"
-	jsonMails := `{
-		"id" : "23",
-		"city": "yes please"
-		}`
-	req, erreq := http.NewRequest("POST", bulkUrl, strings.NewReader(jsonMails))
 	if erreq != nil {
 		fmt.Println(erreq)
 	}

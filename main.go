@@ -156,7 +156,7 @@ func bulkEmails() {
 		Records []Email `json:"records"`
 	}
 	toBulk := JSONObject{
-		Index:   "mails",
+		Index:   "emails",
 		Records: Mails,
 	}
 	jsonMails, err := json.Marshal(toBulk)

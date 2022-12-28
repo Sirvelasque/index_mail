@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,6 +27,8 @@ func main() {
 	if err != nil {
 		fmt.Printf("error walking the path %q: %v\n", root, err)
 	}
+
+	bulkEmails()
 }
 
 func visit(path string, info os.FileInfo, err error) error {
@@ -142,4 +147,36 @@ func createMail(MessageID string, From string, To string, Subject string, Conten
 		Subject:   Subject,
 		Content:   Content,
 	}
+}
+
+func bulkEmails() {
+	bulkUrl := "http://localhost:4080/api/_bulkv2"
+	type JSONObject struct {
+		Index   string  `json:"index"`
+		Records []Email `json:"records"`
+	}
+	toBulk := JSONObject{
+		Index:   "emails",
+		Records: Mails,
+	}
+	jsonMails, err := json.Marshal(toBulk)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	req, erreq := http.NewRequest("POST", bulkUrl, bytes.NewBuffer(jsonMails))
+	if erreq != nil {
+		fmt.Println(erreq)
+	}
+	req.SetBasicAuth("admin", "Complexpass#123")
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println("res error: ", err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println(resp.StatusCode)
 }

@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,6 +23,9 @@ type Email struct {
 var Mails []Email
 
 func main() {
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 	fmt.Println("working")
 	root := os.Args[1]
 	err := filepath.Walk(root, visit)
@@ -29,6 +34,7 @@ func main() {
 	}
 
 	bulkEmails()
+
 }
 
 func visit(path string, info os.FileInfo, err error) error {
@@ -132,7 +138,7 @@ func getMessage(content string, obj string) string {
 	if pos == -1 {
 		return "Oops! something went wrong getting the message content"
 	}
-	return content[pos+21:]
+	return content[pos:]
 }
 
 func pushData(data Email) {

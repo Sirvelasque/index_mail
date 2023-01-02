@@ -1,0 +1,3197 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   inkscape:version="1.0 (4035a4fb49, 2020-05-01)"
+   sodipodi:docname="pprof001.svg"
+   id="svg1052"
+   version="1.1"
+   height="100%"
+   width="100%">
+  <metadata
+     id="metadata1058">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <defs
+     id="defs1056" />
+  <sodipodi:namedview
+     inkscape:current-layer="svg1052"
+     inkscape:window-maximized="1"
+     inkscape:window-y="-8"
+     inkscape:window-x="-8"
+     inkscape:cy="161.52056"
+     inkscape:cx="171.45856"
+     inkscape:zoom="4.8884649"
+     showgrid="false"
+     id="namedview1054"
+     inkscape:window-height="1057"
+     inkscape:window-width="1920"
+     inkscape:pageshadow="2"
+     inkscape:pageopacity="0"
+     guidetolerance="10"
+     gridtolerance="10"
+     objecttolerance="10"
+     borderopacity="1"
+     bordercolor="#666666"
+     pagecolor="#ffffff" />
+  <script
+     id="script2"
+     type="text/ecmascript"><![CDATA[
+/**
+ *  SVGPan library 1.2.2
+ * ======================
+ *
+ * Given an unique existing element with id "viewport" (or when missing, the
+ * first g-element), including the library into any SVG adds the following
+ * capabilities:
+ *
+ *  - Mouse panning
+ *  - Mouse zooming (using the wheel)
+ *  - Object dragging
+ *
+ * You can configure the behaviour of the pan/zoom/drag with the variables
+ * listed in the CONFIGURATION section of this file.
+ *
+ * Known issues:
+ *
+ *  - Zooming (while panning) on Safari has still some issues
+ *
+ * Releases:
+ *
+ * 1.2.2, Tue Aug 30 17:21:56 CEST 2011, Andrea Leofreddi
+ *	- Fixed viewBox on root tag (#7)
+ *	- Improved zoom speed (#2)
+ *
+ * 1.2.1, Mon Jul  4 00:33:18 CEST 2011, Andrea Leofreddi
+ *	- Fixed a regression with mouse wheel (now working on Firefox 5)
+ *	- Working with viewBox attribute (#4)
+ *	- Added "use strict;" and fixed resulting warnings (#5)
+ *	- Added configuration variables, dragging is disabled by default (#3)
+ *
+ * 1.2, Sat Mar 20 08:42:50 GMT 2010, Zeng Xiaohui
+ *	Fixed a bug with browser mouse handler interaction
+ *
+ * 1.1, Wed Feb  3 17:39:33 GMT 2010, Zeng Xiaohui
+ *	Updated the zoom code to support the mouse wheel on Safari/Chrome
+ *
+ * 1.0, Andrea Leofreddi
+ *	First release
+ *
+ * This code is licensed under the following BSD license:
+ *
+ * Copyright 2009-2017 Andrea Leofreddi <a.leofreddi@vleo.net>. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification, are
+ * permitted provided that the following conditions are met:
+ *
+ *    1. Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *    2. Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in the
+ *       documentation and/or other materials provided with the distribution.
+ *    3. Neither the name of the copyright holder nor the names of its
+ *       contributors may be used to endorse or promote products derived from
+ *       this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY COPYRIGHT HOLDERS AND CONTRIBUTORS ''AS IS'' AND ANY EXPRESS
+ * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL COPYRIGHT HOLDERS OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * The views and conclusions contained in the software and documentation are those of the
+ * authors and should not be interpreted as representing official policies, either expressed
+ * or implied, of Andrea Leofreddi.
+ */
+
+"use strict";
+
+/// CONFIGURATION
+/// ====>
+
+var enablePan = 1; // 1 or 0: enable or disable panning (default enabled)
+var enableZoom = 1; // 1 or 0: enable or disable zooming (default enabled)
+var enableDrag = 0; // 1 or 0: enable or disable dragging (default disabled)
+var zoomScale = 0.2; // Zoom sensitivity
+
+/// <====
+/// END OF CONFIGURATION
+
+var root = document.documentElement;
+
+var state = 'none', svgRoot = null, stateTarget, stateOrigin, stateTf;
+
+setupHandlers(root);
+
+/**
+ * Register handlers
+ */
+function setupHandlers(root){
+	setAttributes(root, {
+		"onmouseup" : "handleMouseUp(evt)",
+		"onmousedown" : "handleMouseDown(evt)",
+		"onmousemove" : "handleMouseMove(evt)",
+		//"onmouseout" : "handleMouseUp(evt)", // Decomment this to stop the pan functionality when dragging out of the SVG element
+	});
+
+	if(navigator.userAgent.toLowerCase().indexOf('webkit') >= 0)
+		window.addEventListener('mousewheel', handleMouseWheel, false); // Chrome/Safari
+	else
+		window.addEventListener('DOMMouseScroll', handleMouseWheel, false); // Others
+}
+
+/**
+ * Retrieves the root element for SVG manipulation. The element is then cached into the svgRoot global variable.
+ */
+function getRoot(root) {
+	if(svgRoot == null) {
+		var r = root.getElementById("viewport") ? root.getElementById("viewport") : root.documentElement, t = r;
+
+		while(t != root) {
+			if(t.getAttribute("viewBox")) {
+				setCTM(r, t.getCTM());
+
+				t.removeAttribute("viewBox");
+			}
+
+			t = t.parentNode;
+		}
+
+		svgRoot = r;
+	}
+
+	return svgRoot;
+}
+
+/**
+ * Instance an SVGPoint object with given event coordinates.
+ */
+function getEventPoint(evt) {
+	var p = root.createSVGPoint();
+
+	p.x = evt.clientX;
+	p.y = evt.clientY;
+
+	return p;
+}
+
+/**
+ * Sets the current transform matrix of an element.
+ */
+function setCTM(element, matrix) {
+	var s = "matrix(" + matrix.a + "," + matrix.b + "," + matrix.c + "," + matrix.d + "," + matrix.e + "," + matrix.f + ")";
+
+	element.setAttribute("transform", s);
+}
+
+/**
+ * Dumps a matrix to a string (useful for debug).
+ */
+function dumpMatrix(matrix) {
+	var s = "[ " + matrix.a + ", " + matrix.c + ", " + matrix.e + "\n  " + matrix.b + ", " + matrix.d + ", " + matrix.f + "\n  0, 0, 1 ]";
+
+	return s;
+}
+
+/**
+ * Sets attributes of an element.
+ */
+function setAttributes(element, attributes){
+	for (var i in attributes)
+		element.setAttributeNS(null, i, attributes[i]);
+}
+
+/**
+ * Handle mouse wheel event.
+ */
+function handleMouseWheel(evt) {
+	if(!enableZoom)
+		return;
+
+	if(evt.preventDefault)
+		evt.preventDefault();
+
+	evt.returnValue = false;
+
+	var svgDoc = evt.target.ownerDocument;
+
+	var delta;
+
+	if(evt.wheelDelta)
+		delta = evt.wheelDelta / 360; // Chrome/Safari
+	else
+		delta = evt.detail / -9; // Mozilla
+
+	var z = Math.pow(1 + zoomScale, delta);
+
+	var g = getRoot(svgDoc);
+	
+	var p = getEventPoint(evt);
+
+	p = p.matrixTransform(g.getCTM().inverse());
+
+	// Compute new scale matrix in current mouse position
+	var k = root.createSVGMatrix().translate(p.x, p.y).scale(z).translate(-p.x, -p.y);
+
+        setCTM(g, g.getCTM().multiply(k));
+
+	if(typeof(stateTf) == "undefined")
+		stateTf = g.getCTM().inverse();
+
+	stateTf = stateTf.multiply(k.inverse());
+}
+
+/**
+ * Handle mouse move event.
+ */
+function handleMouseMove(evt) {
+	if(evt.preventDefault)
+		evt.preventDefault();
+
+	evt.returnValue = false;
+
+	var svgDoc = evt.target.ownerDocument;
+
+	var g = getRoot(svgDoc);
+
+	if(state == 'pan' && enablePan) {
+		// Pan mode
+		var p = getEventPoint(evt).matrixTransform(stateTf);
+
+		setCTM(g, stateTf.inverse().translate(p.x - stateOrigin.x, p.y - stateOrigin.y));
+	} else if(state == 'drag' && enableDrag) {
+		// Drag mode
+		var p = getEventPoint(evt).matrixTransform(g.getCTM().inverse());
+
+		setCTM(stateTarget, root.createSVGMatrix().translate(p.x - stateOrigin.x, p.y - stateOrigin.y).multiply(g.getCTM().inverse()).multiply(stateTarget.getCTM()));
+
+		stateOrigin = p;
+	}
+}
+
+/**
+ * Handle click event.
+ */
+function handleMouseDown(evt) {
+	if(evt.preventDefault)
+		evt.preventDefault();
+
+	evt.returnValue = false;
+
+	var svgDoc = evt.target.ownerDocument;
+
+	var g = getRoot(svgDoc);
+
+	if(
+		evt.target.tagName == "svg"
+		|| !enableDrag // Pan anyway when drag is disabled and the user clicked on an element
+	) {
+		// Pan mode
+		state = 'pan';
+
+		stateTf = g.getCTM().inverse();
+
+		stateOrigin = getEventPoint(evt).matrixTransform(stateTf);
+	} else {
+		// Drag mode
+		state = 'drag';
+
+		stateTarget = evt.target;
+
+		stateTf = g.getCTM().inverse();
+
+		stateOrigin = getEventPoint(evt).matrixTransform(stateTf);
+	}
+}
+
+/**
+ * Handle mouse button release event.
+ */
+function handleMouseUp(evt) {
+	if(evt.preventDefault)
+		evt.preventDefault();
+
+	evt.returnValue = false;
+
+	var svgDoc = evt.target.ownerDocument;
+
+	if(state == 'pan' || state == 'drag') {
+		// Quit pan mode
+		state = '';
+	}
+}
+]]></script>
+  <g
+     transform="matrix(0.5,0,0,0.5,-82.552178,-360.32084)"
+     id="viewport">
+    <g
+       transform="translate(4,1605)"
+       class="graph"
+       id="graph0">
+      <title
+         id="title4">unnamed</title>
+      <polygon
+         id="polygon6"
+         points="-4,4 -4,-1605 780.5,-1605 780.5,4 "
+         stroke="none"
+         fill="#ffffff" />
+      <g
+         class="cluster"
+         id="clust1">
+        <title
+           id="title8">cluster_L</title>
+        <polygon
+           id="polygon10"
+           points="8,-1442 8,-1593 430,-1593 430,-1442 "
+           stroke="#000000"
+           fill="none" />
+      </g>
+      <!-- Type: cpu -->
+      <g
+         class="node"
+         id="node1">
+        <title
+           id="title13">Type: cpu</title>
+        <polygon
+           id="polygon15"
+           points="422,-1585 16,-1585 16,-1450 422,-1450 "
+           stroke="#000000"
+           fill="#f8f8f8" />
+        <text
+           id="text17"
+           font-size="16px"
+           font-family="'Times New Roman', serif"
+           y="-1568.2"
+           x="24"
+           text-anchor="start">Type: cpu</text>
+        <text
+           id="text19"
+           font-size="16px"
+           font-family="'Times New Roman', serif"
+           y="-1550.2"
+           x="24"
+           text-anchor="start">Time: Dec 30, 2022 at 6:44pm (CST)</text>
+        <text
+           id="text21"
+           font-size="16px"
+           font-family="'Times New Roman', serif"
+           y="-1532.2"
+           x="24"
+           text-anchor="start">Duration: 30.20s, Total samples = 18.16s (60.13%)</text>
+        <text
+           id="text23"
+           font-size="16px"
+           font-family="'Times New Roman', serif"
+           y="-1514.2"
+           x="24"
+           text-anchor="start">Showing nodes accounting for 17.92s, 98.68% of 18.16s total</text>
+        <text
+           id="text25"
+           font-size="16px"
+           font-family="'Times New Roman', serif"
+           y="-1496.2"
+           x="24"
+           text-anchor="start">Dropped 78 nodes (cum &lt;= 0.09s)</text>
+        <text
+           id="text27"
+           font-size="16px"
+           font-family="'Times New Roman', serif"
+           y="-1459.2"
+           x="24"
+           text-anchor="start">See https://git.io/JfYMW for how to read the graph</text>
+      </g>
+      <!-- N1 -->
+      <g
+         class="node"
+         id="g45">
+        <title
+           id="title30">N1</title>
+        <g
+           id="a_node1">
+          <a
+             id="a42"
+             xlink:title="runtime.cgocall (17.95s)">
+            <polygon
+               id="polygon32"
+               points="586.5,-112 385.5,-112 385.5,0 586.5,0 "
+               stroke="#b20000"
+               fill="#edd5d5" />
+            <text
+               id="text34"
+               font-size="24px"
+               font-family="'Times New Roman', serif"
+               y="-88.800003"
+               x="486"
+               text-anchor="middle">runtime</text>
+            <text
+               id="text36"
+               font-size="24px"
+               font-family="'Times New Roman', serif"
+               y="-62.799999"
+               x="486"
+               text-anchor="middle">cgocall</text>
+            <text
+               id="text38"
+               font-size="24px"
+               font-family="'Times New Roman', serif"
+               y="-36.799999"
+               x="486"
+               text-anchor="middle">17.92s (98.68%)</text>
+            <text
+               id="text40"
+               font-size="24px"
+               font-family="'Times New Roman', serif"
+               y="-10.8"
+               x="486"
+               text-anchor="middle">of 17.95s (98.84%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N2 -->
+      <g
+         class="node"
+         id="node2">
+        <title
+           id="title47">N2</title>
+        <g
+           id="a_node2">
+          <a
+             id="a57"
+             xlink:title="runtime.main (18.07s)">
+            <polygon
+               id="polygon49"
+               points="532,-1535.5 440,-1535.5 440,-1499.5 532,-1499.5 "
+               stroke="#b20000"
+               fill="#edd5d5" />
+            <text
+               id="text51"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1524.6"
+               x="486"
+               text-anchor="middle">runtime</text>
+            <text
+               id="text53"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1515.6"
+               x="486"
+               text-anchor="middle">main</text>
+            <text
+               id="text55"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1506.6"
+               x="486"
+               text-anchor="middle">0 of 18.07s (99.50%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N17 -->
+      <g
+         class="node"
+         id="node17">
+        <title
+           id="title61">N17</title>
+        <g
+           id="a_node17">
+          <a
+             id="a71"
+             xlink:title="main.main (18.07s)">
+            <polygon
+               id="polygon63"
+               points="532,-1399 440,-1399 440,-1363 532,-1363 "
+               stroke="#b20000"
+               fill="#edd5d5" />
+            <text
+               id="text65"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1388.1"
+               x="486"
+               text-anchor="middle">main</text>
+            <text
+               id="text67"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1379.1"
+               x="486"
+               text-anchor="middle">main</text>
+            <text
+               id="text69"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1370.1"
+               x="486"
+               text-anchor="middle">0 of 18.07s (99.50%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N2&#45;&gt;N17 -->
+      <g
+         class="edge"
+         id="edge3">
+        <title
+           id="title75">N2-&gt;N17</title>
+        <g
+           id="a_edge3">
+          <a
+             id="a81"
+             xlink:title="runtime.main -&gt; main.main (18.07s)">
+            <path
+               id="path77"
+               d="m 486,-1499.19 c 0,21.08 0,57.17 0,83.74"
+               stroke-width="5"
+               stroke="#b20000"
+               fill="none" />
+            <polygon
+               id="polygon79"
+               points="486,-1405.48 481.63,-1415.48 490.38,-1415.48 "
+               stroke-width="5"
+               stroke="#b20000"
+               fill="#b20000" />
+          </a>
+        </g>
+        <g
+           id="a_edge3-label">
+          <a
+             id="a86"
+             xlink:title="runtime.main -&gt; main.main (18.07s)">
+            <text
+               id="text84"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-1420.8"
+               x="506.5"
+               text-anchor="middle">18.07s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N3 -->
+      <g
+         class="node"
+         id="node3">
+        <title
+           id="title90">N3</title>
+        <g
+           id="a_node3">
+          <a
+             id="a100"
+             xlink:title="syscall.SyscallN (17.95s)">
+            <polygon
+               id="polygon92"
+               points="532,-199 440,-199 440,-163 532,-163 "
+               stroke="#b20000"
+               fill="#edd5d5" />
+            <text
+               id="text94"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-188.10001"
+               x="486"
+               text-anchor="middle">syscall</text>
+            <text
+               id="text96"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-179.10001"
+               x="486"
+               text-anchor="middle">SyscallN</text>
+            <text
+               id="text98"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-170.10001"
+               x="486"
+               text-anchor="middle">0 of 17.95s (98.84%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N3&#45;&gt;N1 -->
+      <g
+         class="edge"
+         id="edge4">
+        <title
+           id="title104">N3-&gt;N1</title>
+        <g
+           id="a_edge4">
+          <a
+             id="a110"
+             xlink:title="syscall.SyscallN -&gt; runtime.cgocall (17.95s)">
+            <path
+               id="path106"
+               d="m 486,-162.64 c 0,9.27 0,21.36 0,34.04"
+               stroke-width="5"
+               stroke="#b20000"
+               fill="none" />
+            <polygon
+               id="polygon108"
+               points="486,-118.63 481.63,-128.63 490.38,-128.63 "
+               stroke-width="5"
+               stroke="#b20000"
+               fill="#b20000" />
+          </a>
+        </g>
+        <g
+           id="a_edge4-label">
+          <a
+             id="a115"
+             xlink:title="syscall.SyscallN -&gt; runtime.cgocall (17.95s)">
+            <text
+               id="text113"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-133.8"
+               x="506.5"
+               text-anchor="middle">17.95s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N4 -->
+      <g
+         class="node"
+         id="node4">
+        <title
+           id="title119">N4</title>
+        <g
+           id="a_node4">
+          <a
+             id="a129"
+             xlink:title="path/filepath.walk (18.07s)">
+            <polygon
+               id="polygon121"
+               points="532,-1225 440,-1225 440,-1189 532,-1189 "
+               stroke="#b20000"
+               fill="#edd5d5" />
+            <text
+               id="text123"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1214.1"
+               x="486"
+               text-anchor="middle">filepath</text>
+            <text
+               id="text125"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1205.1"
+               x="486"
+               text-anchor="middle">walk</text>
+            <text
+               id="text127"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1196.1"
+               x="486"
+               text-anchor="middle">0 of 18.07s (99.50%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N9 -->
+      <g
+         class="node"
+         id="node9">
+        <title
+           id="title133">N9</title>
+        <g
+           id="a_node9">
+          <a
+             id="a143"
+             xlink:title="path/filepath.readDirNames (0.24s)">
+            <polygon
+               id="polygon135"
+               points="633.5,-1138 550.5,-1138 550.5,-1102 633.5,-1102 "
+               stroke="#b2afa6"
+               fill="#edeceb" />
+            <text
+               id="text137"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1127.1"
+               x="592"
+               text-anchor="middle">filepath</text>
+            <text
+               id="text139"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1118.1"
+               x="592"
+               text-anchor="middle">readDirNames</text>
+            <text
+               id="text141"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1109.1"
+               x="592"
+               text-anchor="middle">0 of 0.24s (1.32%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N4&#45;&gt;N9 -->
+      <g
+         class="edge"
+         id="edge22">
+        <title
+           id="title147">N4-&gt;N9</title>
+        <g
+           id="a_edge22">
+          <a
+             id="a153"
+             xlink:title="path/filepath.walk -&gt; path/filepath.readDirNames (0.24s)">
+            <path
+               id="path149"
+               d="m 508.52,-1188.67 c 7.21,5.6 15.21,11.86 22.48,17.67 10.24,8.18 21.35,17.23 31.25,25.36"
+               stroke="#b2afa6"
+               fill="none" />
+            <polygon
+               id="polygon151"
+               points="569.77,-1139.45 559.82,-1143.11 564.27,-1148.51 "
+               stroke="#b2afa6"
+               fill="#b2afa6" />
+          </a>
+        </g>
+        <g
+           id="a_edge22-label">
+          <a
+             id="a158"
+             xlink:title="path/filepath.walk -&gt; path/filepath.readDirNames (0.24s)">
+            <text
+               id="text156"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-1159.8"
+               x="566"
+               text-anchor="middle">0.24s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N18 -->
+      <g
+         class="node"
+         id="node18">
+        <title
+           id="title162">N18</title>
+        <g
+           id="a_node18">
+          <a
+             id="a172"
+             xlink:title="main.visit (15.41s)">
+            <polygon
+               id="polygon164"
+               points="532,-1138 440,-1138 440,-1102 532,-1102 "
+               stroke="#b20800"
+               fill="#edd6d5" />
+            <text
+               id="text166"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1127.1"
+               x="486"
+               text-anchor="middle">main</text>
+            <text
+               id="text168"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1118.1"
+               x="486"
+               text-anchor="middle">visit</text>
+            <text
+               id="text170"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1109.1"
+               x="486"
+               text-anchor="middle">0 of 15.41s (84.86%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N4&#45;&gt;N18 -->
+      <g
+         class="edge"
+         id="edge6">
+        <title
+           id="title176">N4-&gt;N18</title>
+        <g
+           id="a_edge6">
+          <a
+             id="a182"
+             xlink:title="path/filepath.walk -&gt; main.visit (15.41s)">
+            <path
+               id="path178"
+               d="m 486,-1188.8 c 0,9.84 0,22.53 0,34.27"
+               stroke-width="5"
+               stroke="#b20800"
+               fill="none" />
+            <polygon
+               id="polygon180"
+               points="486,-1144.7 481.63,-1154.7 490.38,-1154.7 "
+               stroke-width="5"
+               stroke="#b20800"
+               fill="#b20800" />
+          </a>
+        </g>
+        <g
+           id="a_edge6-label">
+          <a
+             id="a187"
+             xlink:title="path/filepath.walk -&gt; main.visit (15.41s)">
+            <text
+               id="text185"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-1159.8"
+               x="506.5"
+               text-anchor="middle">15.41s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N21 -->
+      <g
+         class="node"
+         id="node21">
+        <title
+           id="title191">N21</title>
+        <g
+           id="a_node21">
+          <a
+             id="a201"
+             xlink:title="os.Lstat (2.42s)">
+            <polygon
+               id="polygon193"
+               points="757.5,-1138 670.5,-1138 670.5,-1102 757.5,-1102 "
+               stroke="#b2713b"
+               fill="#ede4dd" />
+            <text
+               id="text195"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1127.1"
+               x="714"
+               text-anchor="middle">os</text>
+            <text
+               id="text197"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1118.1"
+               x="714"
+               text-anchor="middle">Lstat</text>
+            <text
+               id="text199"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1109.1"
+               x="714"
+               text-anchor="middle">0 of 2.42s (13.33%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N4&#45;&gt;N21 -->
+      <g
+         class="edge"
+         id="edge19">
+        <title
+           id="title205">N4-&gt;N21</title>
+        <g
+           id="a_edge19">
+          <a
+             id="a211"
+             xlink:title="path/filepath.walk -&gt; os.Lstat (2.42s)">
+            <path
+               id="path207"
+               d="m 532.4,-1190.37 c 17.21,5.91 36.85,12.8 54.6,19.37 24.27,8.98 50.94,19.4 73.55,28.39"
+               stroke="#b2713b"
+               fill="none" />
+            <polygon
+               id="polygon209"
+               points="669.56,-1139.02 658.98,-1139.47 661.57,-1145.97 "
+               stroke="#b2713b"
+               fill="#b2713b" />
+          </a>
+        </g>
+        <g
+           id="a_edge19-label">
+          <a
+             id="a216"
+             xlink:title="path/filepath.walk -&gt; os.Lstat (2.42s)">
+            <text
+               id="text214"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-1159.8"
+               x="642"
+               text-anchor="middle">2.42s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N5 -->
+      <g
+         class="node"
+         id="node5">
+        <title
+           id="title220">N5</title>
+        <g
+           id="a_node5">
+          <a
+             id="a230"
+             xlink:title="syscall.Syscall (2.80s)">
+            <polygon
+               id="polygon222"
+               points="637.5,-460 550.5,-460 550.5,-424 637.5,-424 "
+               stroke="#b26328"
+               fill="#ede2da" />
+            <text
+               id="text224"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-449.10001"
+               x="594"
+               text-anchor="middle">syscall</text>
+            <text
+               id="text226"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-440.10001"
+               x="594"
+               text-anchor="middle">Syscall</text>
+            <text
+               id="text228"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-431.10001"
+               x="594"
+               text-anchor="middle">0 of 2.80s (15.42%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N5&#45;&gt;N3 -->
+      <g
+         class="edge"
+         id="edge16">
+        <title
+           id="title234">N5-&gt;N3</title>
+        <g
+           id="a_edge16">
+          <a
+             id="a240"
+             xlink:title="syscall.Syscall -&gt; syscall.SyscallN (2.80s)">
+            <path
+               id="path236"
+               d="m 592.89,-423.69 c -3.29,39.84 -15.91,139.76 -61.89,206.69 -2.51,3.66 -5.53,7.11 -8.79,10.31"
+               stroke="#b26328"
+               fill="none" />
+            <polygon
+               id="polygon238"
+               points="514.88,-200.25 520.09,-209.48 524.7,-204.22 "
+               stroke="#b26328"
+               fill="#b26328" />
+          </a>
+        </g>
+        <g
+           id="a_edge16-label">
+          <a
+             id="a245"
+             xlink:title="syscall.Syscall -&gt; syscall.SyscallN (2.80s)">
+            <text
+               id="text243"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-307.79999"
+               x="591"
+               text-anchor="middle">2.80s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N6 -->
+      <g
+         class="node"
+         id="node6">
+        <title
+           id="title249">N6</title>
+        <g
+           id="a_node6">
+          <a
+             id="a259"
+             xlink:title="os.ReadFile (15.38s)">
+            <polygon
+               id="polygon251"
+               points="532,-922 440,-922 440,-886 532,-886 "
+               stroke="#b20800"
+               fill="#edd6d5" />
+            <text
+               id="text253"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-911.09998"
+               x="486"
+               text-anchor="middle">os</text>
+            <text
+               id="text255"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-902.09998"
+               x="486"
+               text-anchor="middle">ReadFile</text>
+            <text
+               id="text257"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-893.09998"
+               x="486"
+               text-anchor="middle">0 of 15.38s (84.69%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N7 -->
+      <g
+         class="node"
+         id="node7">
+        <title
+           id="title263">N7</title>
+        <g
+           id="a_node7">
+          <a
+             id="a273"
+             xlink:title="os.Open (15.16s)">
+            <polygon
+               id="polygon265"
+               points="532,-812 440,-812 440,-776 532,-776 "
+               stroke="#b20900"
+               fill="#edd6d5" />
+            <text
+               id="text267"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-801.09998"
+               x="486"
+               text-anchor="middle">os</text>
+            <text
+               id="text269"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-792.09998"
+               x="486"
+               text-anchor="middle">Open</text>
+            <text
+               id="text271"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-783.09998"
+               x="486"
+               text-anchor="middle">0 of 15.16s (83.48%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N6&#45;&gt;N7 -->
+      <g
+         class="edge"
+         id="edge10">
+        <title
+           id="title277">N6-&gt;N7</title>
+        <g
+           id="a_edge10">
+          <a
+             id="a283"
+             xlink:title="os.ReadFile -&gt; os.Open (15.06s)">
+            <path
+               id="path279"
+               d="m 486,-885.65 c 0,15.43 0,38.42 0,57.39"
+               stroke-width="5"
+               stroke="#b20900"
+               fill="none" />
+            <polygon
+               id="polygon281"
+               points="486,-818.55 481.63,-828.55 490.38,-828.55 "
+               stroke-width="5"
+               stroke="#b20900"
+               fill="#b20900" />
+          </a>
+        </g>
+        <g
+           id="a_edge10-label">
+          <a
+             id="a290"
+             xlink:title="os.ReadFile -&gt; os.Open (15.06s)">
+            <text
+               id="text286"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-852.79999"
+               x="507"
+               text-anchor="middle">15.06s</text>
+            <text
+               id="text288"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-837.79999"
+               x="507"
+               text-anchor="middle">(inline)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N13 -->
+      <g
+         class="node"
+         id="node13">
+        <title
+           id="title294">N13</title>
+        <g
+           id="a_node13">
+          <a
+             id="a306"
+             xlink:title="os.(*File).Stat (0.22s)">
+            <polygon
+               id="polygon296"
+               points="410.5,-816 327.5,-816 327.5,-772 410.5,-772 "
+               stroke="#b2afa7"
+               fill="#edeceb" />
+            <text
+               id="text298"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-805.59998"
+               x="369"
+               text-anchor="middle">os</text>
+            <text
+               id="text300"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-796.59998"
+               x="369"
+               text-anchor="middle">(*File)</text>
+            <text
+               id="text302"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-787.59998"
+               x="369"
+               text-anchor="middle">Stat</text>
+            <text
+               id="text304"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-778.59998"
+               x="369"
+               text-anchor="middle">0 of 0.22s (1.21%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N6&#45;&gt;N13 -->
+      <g
+         class="edge"
+         id="edge23">
+        <title
+           id="title310">N6-&gt;N13</title>
+        <g
+           id="a_edge23">
+          <a
+             id="a316"
+             xlink:title="os.ReadFile -&gt; os.(*File).Stat (0.22s)">
+            <path
+               id="path312"
+               d="m 467.2,-885.65 c -17.94,16.56 -45.31,41.83 -66.6,61.49"
+               stroke="#b2afa7"
+               fill="none" />
+            <polygon
+               id="polygon314"
+               points="393.29,-817.42 398.27,-826.78 403.02,-821.64 "
+               stroke="#b2afa7"
+               fill="#b2afa7" />
+          </a>
+        </g>
+        <g
+           id="a_edge23-label">
+          <a
+             id="a321"
+             xlink:title="os.ReadFile -&gt; os.(*File).Stat (0.22s)">
+            <text
+               id="text319"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-845.29999"
+               x="459"
+               text-anchor="middle">0.22s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N22 -->
+      <g
+         class="node"
+         id="node22">
+        <title
+           id="title325">N22</title>
+        <g
+           id="a_node22">
+          <a
+             id="a335"
+             xlink:title="os.OpenFile (15.16s)">
+            <polygon
+               id="polygon327"
+               points="532,-721 440,-721 440,-685 532,-685 "
+               stroke="#b20900"
+               fill="#edd6d5" />
+            <text
+               id="text329"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-710.09998"
+               x="486"
+               text-anchor="middle">os</text>
+            <text
+               id="text331"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-701.09998"
+               x="486"
+               text-anchor="middle">OpenFile</text>
+            <text
+               id="text333"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-692.09998"
+               x="486"
+               text-anchor="middle">0 of 15.16s (83.48%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N7&#45;&gt;N22 -->
+      <g
+         class="edge"
+         id="edge8">
+        <title
+           id="title339">N7-&gt;N22</title>
+        <g
+           id="a_edge8">
+          <a
+             id="a345"
+             xlink:title="os.Open -&gt; os.OpenFile (15.16s)">
+            <path
+               id="path341"
+               d="m 486,-775.84 c 0,10.89 0,25.34 0,38.43"
+               stroke-width="5"
+               stroke="#b20900"
+               fill="none" />
+            <polygon
+               id="polygon343"
+               points="486,-727.65 481.63,-737.65 490.38,-737.65 "
+               stroke-width="5"
+               stroke="#b20900"
+               fill="#b20900" />
+          </a>
+        </g>
+        <g
+           id="a_edge8-label">
+          <a
+             id="a350"
+             xlink:title="os.Open -&gt; os.OpenFile (15.16s)">
+            <text
+               id="text348"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-742.79999"
+               x="506.5"
+               text-anchor="middle">15.16s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N8 -->
+      <g
+         class="node"
+         id="node8">
+        <title
+           id="title354">N8</title>
+        <g
+           id="a_node8">
+          <a
+             id="a364"
+             xlink:title="os.openFileNolog (15.16s)">
+            <polygon
+               id="polygon356"
+               points="532,-634 440,-634 440,-598 532,-598 "
+               stroke="#b20900"
+               fill="#edd6d5" />
+            <text
+               id="text358"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-623.09998"
+               x="486"
+               text-anchor="middle">os</text>
+            <text
+               id="text360"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-614.09998"
+               x="486"
+               text-anchor="middle">openFileNolog</text>
+            <text
+               id="text362"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-605.09998"
+               x="486"
+               text-anchor="middle">0 of 15.16s (83.48%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N12 -->
+      <g
+         class="node"
+         id="node12">
+        <title
+           id="title368">N12</title>
+        <g
+           id="a_node12">
+          <a
+             id="a378"
+             xlink:title="os.openFile (15.06s)">
+            <polygon
+               id="polygon370"
+               points="532,-547 440,-547 440,-511 532,-511 "
+               stroke="#b20900"
+               fill="#edd6d5" />
+            <text
+               id="text372"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-536.09998"
+               x="486"
+               text-anchor="middle">os</text>
+            <text
+               id="text374"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-527.09998"
+               x="486"
+               text-anchor="middle">openFile</text>
+            <text
+               id="text376"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-518.09998"
+               x="486"
+               text-anchor="middle">0 of 15.06s (82.93%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N8&#45;&gt;N12 -->
+      <g
+         class="edge"
+         id="edge11">
+        <title
+           id="title382">N8-&gt;N12</title>
+        <g
+           id="a_edge11">
+          <a
+             id="a388"
+             xlink:title="os.openFileNolog -&gt; os.openFile (15.06s)">
+            <path
+               id="path384"
+               d="m 486,-597.8 c 0,9.84 0,22.53 0,34.27"
+               stroke-width="5"
+               stroke="#b20900"
+               fill="none" />
+            <polygon
+               id="polygon386"
+               points="486,-553.7 481.63,-563.7 490.38,-563.7 "
+               stroke-width="5"
+               stroke="#b20900"
+               fill="#b20900" />
+          </a>
+        </g>
+        <g
+           id="a_edge11-label">
+          <a
+             id="a393"
+             xlink:title="os.openFileNolog -&gt; os.openFile (15.06s)">
+            <text
+               id="text391"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-568.79999"
+               x="506.5"
+               text-anchor="middle">15.06s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N14 -->
+      <g
+         class="node"
+         id="node14">
+        <title
+           id="title397">N14</title>
+        <g
+           id="a_node14">
+          <a
+             id="a407"
+             xlink:title="os.openDir (0.10s)">
+            <polygon
+               id="polygon399"
+               points="633.5,-547 550.5,-547 550.5,-511 633.5,-511 "
+               stroke="#b2b1ad"
+               fill="#ededec" />
+            <text
+               id="text401"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-536.09998"
+               x="592"
+               text-anchor="middle">os</text>
+            <text
+               id="text403"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-527.09998"
+               x="592"
+               text-anchor="middle">openDir</text>
+            <text
+               id="text405"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-518.09998"
+               x="592"
+               text-anchor="middle">0 of 0.10s (0.55%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N8&#45;&gt;N14 -->
+      <g
+         class="edge"
+         id="edge34">
+        <title
+           id="title411">N8-&gt;N14</title>
+        <g
+           id="a_edge34">
+          <a
+             id="a417"
+             xlink:title="os.openFileNolog -&gt; os.openDir (0.10s)">
+            <path
+               id="path413"
+               d="m 508.52,-597.67 c 7.21,5.6 15.21,11.86 22.48,17.67 10.24,8.18 21.35,17.23 31.25,25.36"
+               stroke="#b2b1ad"
+               fill="none" />
+            <polygon
+               id="polygon415"
+               points="569.77,-548.45 559.82,-552.11 564.27,-557.51 "
+               stroke="#b2b1ad"
+               fill="#b2b1ad" />
+          </a>
+        </g>
+        <g
+           id="a_edge34-label">
+          <a
+             id="a422"
+             xlink:title="os.openFileNolog -&gt; os.openDir (0.10s)">
+            <text
+               id="text420"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-568.79999"
+               x="566"
+               text-anchor="middle">0.10s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N9&#45;&gt;N7 -->
+      <g
+         class="edge"
+         id="edge35">
+        <title
+           id="title426">N9-&gt;N7</title>
+        <g
+           id="a_edge35">
+          <a
+             id="a432"
+             xlink:title="path/filepath.readDirNames -&gt; os.Open (0.10s)">
+            <path
+               id="path428"
+               d="m 589.02,-1101.61 c -10.09,58.25 -43.07,244.21 -57.02,267.61 -3.01,5.04 -6.9,9.75 -11.15,14.02"
+               stroke="#b2b1ad"
+               fill="none" />
+            <polygon
+               id="polygon430"
+               points="513.5,-813.34 518.57,-822.64 523.26,-817.45 "
+               stroke="#b2b1ad"
+               fill="#b2b1ad" />
+          </a>
+        </g>
+        <g
+           id="a_edge35-label">
+          <a
+             id="a439"
+             xlink:title="path/filepath.readDirNames -&gt; os.Open (0.10s)">
+            <text
+               id="text435"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-962.79999"
+               x="586"
+               text-anchor="middle">0.10s</text>
+            <text
+               id="text437"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-947.79999"
+               x="586"
+               text-anchor="middle">(inline)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N19 -->
+      <g
+         class="node"
+         id="node19">
+        <title
+           id="title443">N19</title>
+        <g
+           id="a_node19">
+          <a
+             id="a455"
+             xlink:title="os.(*File).Readdirnames (0.14s)">
+            <polygon
+               id="polygon445"
+               points="671.5,-1036 588.5,-1036 588.5,-992 671.5,-992 "
+               stroke="#b2b0ab"
+               fill="#edecec" />
+            <text
+               id="text447"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1025.6"
+               x="630"
+               text-anchor="middle">os</text>
+            <text
+               id="text449"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1016.6"
+               x="630"
+               text-anchor="middle">(*File)</text>
+            <text
+               id="text451"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1007.6"
+               x="630"
+               text-anchor="middle">Readdirnames</text>
+            <text
+               id="text453"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-998.59998"
+               x="630"
+               text-anchor="middle">0 of 0.14s (0.77%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N9&#45;&gt;N19 -->
+      <g
+         class="edge"
+         id="edge28">
+        <title
+           id="title459">N9-&gt;N19</title>
+        <g
+           id="a_edge28">
+          <a
+             id="a465"
+             xlink:title="path/filepath.readDirNames -&gt; os.(*File).Readdirnames (0.14s)">
+            <path
+               id="path461"
+               d="m 598.27,-1101.83 c 5.45,14.91 13.48,36.88 20.1,54.99"
+               stroke="#b2b0ab"
+               fill="none" />
+            <polygon
+               id="polygon463"
+               points="621.75,-1037.58 615.03,-1045.77 621.61,-1048.17 "
+               stroke="#b2b0ab"
+               fill="#b2b0ab" />
+          </a>
+        </g>
+        <g
+           id="a_edge28-label">
+          <a
+             id="a470"
+             xlink:title="path/filepath.readDirNames -&gt; os.(*File).Readdirnames (0.14s)">
+            <text
+               id="text468"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-1065.3"
+               x="632"
+               text-anchor="middle">0.14s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N10 -->
+      <g
+         class="node"
+         id="node10">
+        <title
+           id="title474">N10</title>
+        <g
+           id="a_node10">
+          <a
+             id="a484"
+             xlink:title="syscall.Syscall6 (0.12s)">
+            <polygon
+               id="polygon476"
+               points="285.5,-634 202.5,-634 202.5,-598 285.5,-598 "
+               stroke="#b2b1ac"
+               fill="#edecec" />
+            <text
+               id="text478"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-623.09998"
+               x="244"
+               text-anchor="middle">syscall</text>
+            <text
+               id="text480"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-614.09998"
+               x="244"
+               text-anchor="middle">Syscall6</text>
+            <text
+               id="text482"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-605.09998"
+               x="244"
+               text-anchor="middle">0 of 0.12s (0.66%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N10&#45;&gt;N3 -->
+      <g
+         class="edge"
+         id="edge33">
+        <title
+           id="title488">N10-&gt;N3</title>
+        <g
+           id="a_edge33">
+          <a
+             id="a494"
+             xlink:title="syscall.Syscall6 -&gt; syscall.SyscallN (0.12s)">
+            <path
+               id="path490"
+               d="m 256.53,-597.72 c 10.73,16.54 24.47,42.61 24.47,67.72 0,0 0,0 0,263 0,64.16 86.74,80.81 147.37,84.62"
+               stroke="#b2b1ac"
+               fill="none" />
+            <polygon
+               id="polygon492"
+               points="438.23,-181.87 428.06,-178.89 428.42,-185.88 "
+               stroke="#b2b1ac"
+               fill="#b2b1ac" />
+          </a>
+        </g>
+        <g
+           id="a_edge33-label">
+          <a
+             id="a499"
+             xlink:title="syscall.Syscall6 -&gt; syscall.SyscallN (0.12s)">
+            <text
+               id="text497"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-394.79999"
+               x="298"
+               text-anchor="middle">0.12s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N11 -->
+      <g
+         class="node"
+         id="node11">
+        <title
+           id="title503">N11</title>
+        <g
+           id="a_node11">
+          <a
+             id="a513"
+             xlink:title="os.newFileStatFromGetFileInformationByHandle (0.19s)">
+            <polygon
+               id="polygon505"
+               points="422,-721 246,-721 246,-685 422,-685 "
+               stroke="#b2b0a9"
+               fill="#edeceb" />
+            <text
+               id="text507"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-710.09998"
+               x="334"
+               text-anchor="middle">os</text>
+            <text
+               id="text509"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-701.09998"
+               x="334"
+               text-anchor="middle">newFileStatFromGetFileInformationByHandle</text>
+            <text
+               id="text511"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-692.09998"
+               x="334"
+               text-anchor="middle">0 of 0.19s (1.05%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N11&#45;&gt;N10 -->
+      <g
+         class="edge"
+         id="edge37">
+        <title
+           id="title517">N11-&gt;N10</title>
+        <g
+           id="a_edge37">
+          <a
+             id="a523"
+             xlink:title="os.newFileStatFromGetFileInformationByHandle ... syscall.Syscall6 (0.03s)">
+            <path
+               id="path519"
+               d="m 315.79,-684.8 c -12.97,12.25 -30.6,28.9 -45.15,42.64"
+               stroke-dasharray="1, 5"
+               stroke="#b2b2b1"
+               fill="none" />
+            <polygon
+               id="polygon521"
+               points="263.6,-635.51 268.46,-644.92 273.27,-639.83 "
+               stroke="#b2b2b1"
+               fill="#b2b2b1" />
+          </a>
+        </g>
+        <g
+           id="a_edge37-label">
+          <a
+             id="a528"
+             xlink:title="os.newFileStatFromGetFileInformationByHandle ... syscall.Syscall6 (0.03s)">
+            <text
+               id="text526"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-655.79999"
+               x="312"
+               text-anchor="middle">0.03s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N29 -->
+      <g
+         class="node"
+         id="node29">
+        <title
+           id="title532">N29</title>
+        <g
+           id="a_node29">
+          <a
+             id="a542"
+             xlink:title="syscall.GetFileInformationByHandle (0.15s)">
+            <polygon
+               id="polygon534"
+               points="422,-634 304,-634 304,-598 422,-598 "
+               stroke="#b2b0ab"
+               fill="#edecec" />
+            <text
+               id="text536"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-623.09998"
+               x="363"
+               text-anchor="middle">syscall</text>
+            <text
+               id="text538"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-614.09998"
+               x="363"
+               text-anchor="middle">GetFileInformationByHandle</text>
+            <text
+               id="text540"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-605.09998"
+               x="363"
+               text-anchor="middle">0 of 0.15s (0.83%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N11&#45;&gt;N29 -->
+      <g
+         class="edge"
+         id="edge25">
+        <title
+           id="title546">N11-&gt;N29</title>
+        <g
+           id="a_edge25">
+          <a
+             id="a552"
+             xlink:title="os.newFileStatFromGetFileInformationByHandle -&gt; syscall.GetFileInformationByHandle (0.15s)">
+            <path
+               id="path548"
+               d="m 339.87,-684.8 c 3.86,11.33 9.02,26.44 13.48,39.51"
+               stroke="#b2b0ab"
+               fill="none" />
+            <polygon
+               id="polygon550"
+               points="356.55,-635.9 350.01,-644.23 356.64,-646.49 "
+               stroke="#b2b0ab"
+               fill="#b2b0ab" />
+          </a>
+        </g>
+        <g
+           id="a_edge25-label">
+          <a
+             id="a557"
+             xlink:title="os.newFileStatFromGetFileInformationByHandle -&gt; syscall.GetFileInformationByHandle (0.15s)">
+            <text
+               id="text555"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-655.79999"
+               x="368"
+               text-anchor="middle">0.15s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N30 -->
+      <g
+         class="node"
+         id="node30">
+        <title
+           id="title561">N30</title>
+        <g
+           id="a_node30">
+          <a
+             id="a571"
+             xlink:title="syscall.Open (15.03s)">
+            <polygon
+               id="polygon563"
+               points="532,-460 440,-460 440,-424 532,-424 "
+               stroke="#b20900"
+               fill="#edd6d5" />
+            <text
+               id="text565"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-449.10001"
+               x="486"
+               text-anchor="middle">syscall</text>
+            <text
+               id="text567"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-440.10001"
+               x="486"
+               text-anchor="middle">Open</text>
+            <text
+               id="text569"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-431.10001"
+               x="486"
+               text-anchor="middle">0 of 15.03s (82.76%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N12&#45;&gt;N30 -->
+      <g
+         class="edge"
+         id="edge12">
+        <title
+           id="title575">N12-&gt;N30</title>
+        <g
+           id="a_edge12">
+          <a
+             id="a581"
+             xlink:title="os.openFile -&gt; syscall.Open (15.03s)">
+            <path
+               id="path577"
+               d="m 486,-510.8 c 0,9.84 0,22.53 0,34.27"
+               stroke-width="5"
+               stroke="#b20900"
+               fill="none" />
+            <polygon
+               id="polygon579"
+               points="486,-466.7 481.63,-476.7 490.38,-476.7 "
+               stroke-width="5"
+               stroke="#b20900"
+               fill="#b20900" />
+          </a>
+        </g>
+        <g
+           id="a_edge12-label">
+          <a
+             id="a586"
+             xlink:title="os.openFile -&gt; syscall.Open (15.03s)">
+            <text
+               id="text584"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-481.79999"
+               x="506.5"
+               text-anchor="middle">15.03s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N13&#45;&gt;N11 -->
+      <g
+         class="edge"
+         id="edge24">
+        <title
+           id="title590">N13-&gt;N11</title>
+        <g
+           id="a_edge24">
+          <a
+             id="a596"
+             xlink:title="os.(*File).Stat -&gt; os.newFileStatFromGetFileInformationByHandle (0.19s)">
+            <path
+               id="path592"
+               d="m 360.71,-771.91 c -4.69,11.93 -10.62,26.99 -15.69,39.9"
+               stroke="#b2b0a9"
+               fill="none" />
+            <polygon
+               id="polygon594"
+               points="341.38,-722.76 341.78,-733.35 348.3,-730.79 "
+               stroke="#b2b0a9"
+               fill="#b2b0a9" />
+          </a>
+        </g>
+        <g
+           id="a_edge24-label">
+          <a
+             id="a601"
+             xlink:title="os.(*File).Stat -&gt; os.newFileStatFromGetFileInformationByHandle (0.19s)">
+            <text
+               id="text599"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-742.79999"
+               x="371"
+               text-anchor="middle">0.19s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N14&#45;&gt;N5 -->
+      <g
+         class="edge"
+         id="edge36">
+        <title
+           id="title605">N14-&gt;N5</title>
+        <g
+           id="a_edge36">
+          <a
+             id="a611"
+             xlink:title="os.openDir ... syscall.Syscall (0.09s)">
+            <path
+               id="path607"
+               d="m 592.4,-510.8 c 0.27,11.22 0.62,26.13 0.93,39.11"
+               stroke-dasharray="1, 5"
+               stroke="#b2b1ae"
+               fill="none" />
+            <polygon
+               id="polygon609"
+               points="593.55,-461.98 589.82,-471.9 596.82,-472.06 "
+               stroke="#b2b1ae"
+               fill="#b2b1ae" />
+          </a>
+        </g>
+        <g
+           id="a_edge36-label">
+          <a
+             id="a616"
+             xlink:title="os.openDir ... syscall.Syscall (0.09s)">
+            <text
+               id="text614"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-481.79999"
+               x="610"
+               text-anchor="middle">0.09s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N15 -->
+      <g
+         class="node"
+         id="node15">
+        <title
+           id="title620">N15</title>
+        <g
+           id="a_node15">
+          <a
+             id="a632"
+             xlink:title="internal/poll.(*FD).FindNextFile (0.13s)">
+            <polygon
+               id="polygon622"
+               points="671.5,-816 588.5,-816 588.5,-772 671.5,-772 "
+               stroke="#b2b1ac"
+               fill="#edecec" />
+            <text
+               id="text624"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-805.59998"
+               x="630"
+               text-anchor="middle">poll</text>
+            <text
+               id="text626"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-796.59998"
+               x="630"
+               text-anchor="middle">(*FD)</text>
+            <text
+               id="text628"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-787.59998"
+               x="630"
+               text-anchor="middle">FindNextFile</text>
+            <text
+               id="text630"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-778.59998"
+               x="630"
+               text-anchor="middle">0 of 0.13s (0.72%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N27 -->
+      <g
+         class="node"
+         id="node27">
+        <title
+           id="title636">N27</title>
+        <g
+           id="a_node27">
+          <a
+             id="a646"
+             xlink:title="syscall.FindNextFile (0.13s)">
+            <polygon
+               id="polygon638"
+               points="676.5,-721 593.5,-721 593.5,-685 676.5,-685 "
+               stroke="#b2b1ac"
+               fill="#edecec" />
+            <text
+               id="text640"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-710.09998"
+               x="635"
+               text-anchor="middle">syscall</text>
+            <text
+               id="text642"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-701.09998"
+               x="635"
+               text-anchor="middle">FindNextFile</text>
+            <text
+               id="text644"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-692.09998"
+               x="635"
+               text-anchor="middle">0 of 0.13s (0.72%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N15&#45;&gt;N27 -->
+      <g
+         class="edge"
+         id="edge29">
+        <title
+           id="title650">N15-&gt;N27</title>
+        <g
+           id="a_edge29">
+          <a
+             id="a656"
+             xlink:title="internal/poll.(*FD).FindNextFile -&gt; syscall.FindNextFile (0.13s)">
+            <path
+               id="path652"
+               d="m 631.18,-771.91 c 0.66,11.69 1.49,26.39 2.2,39.12"
+               stroke="#b2b1ac"
+               fill="none" />
+            <polygon
+               id="polygon654"
+               points="633.94,-722.87 629.88,-732.65 636.87,-733.05 "
+               stroke="#b2b1ac"
+               fill="#b2b1ac" />
+          </a>
+        </g>
+        <g
+           id="a_edge29-label">
+          <a
+             id="a661"
+             xlink:title="internal/poll.(*FD).FindNextFile -&gt; syscall.FindNextFile (0.13s)">
+            <text
+               id="text659"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-742.79999"
+               x="649"
+               text-anchor="middle">0.13s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N16 -->
+      <g
+         class="node"
+         id="node16">
+        <title
+           id="title665">N16</title>
+        <g
+           id="a_node16">
+          <a
+             id="a675"
+             xlink:title="main.appendInfo (15.41s)">
+            <polygon
+               id="polygon667"
+               points="532,-1032 440,-1032 440,-996 532,-996 "
+               stroke="#b20800"
+               fill="#edd6d5" />
+            <text
+               id="text669"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1021.1"
+               x="486"
+               text-anchor="middle">main</text>
+            <text
+               id="text671"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1012.1"
+               x="486"
+               text-anchor="middle">appendInfo</text>
+            <text
+               id="text673"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1003.1"
+               x="486"
+               text-anchor="middle">0 of 15.41s (84.86%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N16&#45;&gt;N6 -->
+      <g
+         class="edge"
+         id="edge7">
+        <title
+           id="title679">N16-&gt;N6</title>
+        <g
+           id="a_edge7">
+          <a
+             id="a685"
+             xlink:title="main.appendInfo -&gt; os.ReadFile (15.38s)">
+            <path
+               id="path681"
+               d="m 486,-995.65 c 0,15.43 0,38.42 0,57.39"
+               stroke-width="5"
+               stroke="#b20800"
+               fill="none" />
+            <polygon
+               id="polygon683"
+               points="486,-928.55 481.63,-938.55 490.38,-938.55 "
+               stroke-width="5"
+               stroke="#b20800"
+               fill="#b20800" />
+          </a>
+        </g>
+        <g
+           id="a_edge7-label">
+          <a
+             id="a690"
+             xlink:title="main.appendInfo -&gt; os.ReadFile (15.38s)">
+            <text
+               id="text688"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-955.29999"
+               x="506.5"
+               text-anchor="middle">15.38s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N25 -->
+      <g
+         class="node"
+         id="node25">
+        <title
+           id="title694">N25</title>
+        <g
+           id="a_node25">
+          <a
+             id="a704"
+             xlink:title="path/filepath.Walk (18.07s)">
+            <polygon
+               id="polygon696"
+               points="532,-1312 440,-1312 440,-1276 532,-1276 "
+               stroke="#b20000"
+               fill="#edd5d5" />
+            <text
+               id="text698"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1301.1"
+               x="486"
+               text-anchor="middle">filepath</text>
+            <text
+               id="text700"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1292.1"
+               x="486"
+               text-anchor="middle">Walk</text>
+            <text
+               id="text702"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1283.1"
+               x="486"
+               text-anchor="middle">0 of 18.07s (99.50%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N17&#45;&gt;N25 -->
+      <g
+         class="edge"
+         id="edge1">
+        <title
+           id="title708">N17-&gt;N25</title>
+        <g
+           id="a_edge1">
+          <a
+             id="a714"
+             xlink:title="main.main -&gt; path/filepath.Walk (18.07s)">
+            <path
+               id="path710"
+               d="m 486,-1362.8 c 0,9.84 0,22.53 0,34.27"
+               stroke-width="5"
+               stroke="#b20000"
+               fill="none" />
+            <polygon
+               id="polygon712"
+               points="486,-1318.7 481.63,-1328.7 490.38,-1328.7 "
+               stroke-width="5"
+               stroke="#b20000"
+               fill="#b20000" />
+          </a>
+        </g>
+        <g
+           id="a_edge1-label">
+          <a
+             id="a719"
+             xlink:title="main.main -&gt; path/filepath.Walk (18.07s)">
+            <text
+               id="text717"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-1333.8"
+               x="506.5"
+               text-anchor="middle">18.07s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N18&#45;&gt;N16 -->
+      <g
+         class="edge"
+         id="edge5">
+        <title
+           id="title723">N18-&gt;N16</title>
+        <g
+           id="a_edge5">
+          <a
+             id="a729"
+             xlink:title="main.visit -&gt; main.appendInfo (15.41s)">
+            <path
+               id="path725"
+               d="m 486,-1101.83 c 0,14.53 0,35.77 0,53.61"
+               stroke-width="5"
+               stroke="#b20800"
+               fill="none" />
+            <polygon
+               id="polygon727"
+               points="486,-1038.44 481.63,-1048.44 490.38,-1048.44 "
+               stroke-width="5"
+               stroke="#b20800"
+               fill="#b20800" />
+          </a>
+        </g>
+        <g
+           id="a_edge5-label">
+          <a
+             id="a734"
+             xlink:title="main.visit -&gt; main.appendInfo (15.41s)">
+            <text
+               id="text732"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-1065.3"
+               x="506.5"
+               text-anchor="middle">15.41s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N20 -->
+      <g
+         class="node"
+         id="node20">
+        <title
+           id="title738">N20</title>
+        <g
+           id="a_node20">
+          <a
+             id="a750"
+             xlink:title="os.(*File).readdir (0.14s)">
+            <polygon
+               id="polygon740"
+               points="671.5,-926 588.5,-926 588.5,-882 671.5,-882 "
+               stroke="#b2b0ab"
+               fill="#edecec" />
+            <text
+               id="text742"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-915.59998"
+               x="630"
+               text-anchor="middle">os</text>
+            <text
+               id="text744"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-906.59998"
+               x="630"
+               text-anchor="middle">(*File)</text>
+            <text
+               id="text746"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-897.59998"
+               x="630"
+               text-anchor="middle">readdir</text>
+            <text
+               id="text748"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-888.59998"
+               x="630"
+               text-anchor="middle">0 of 0.14s (0.77%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N19&#45;&gt;N20 -->
+      <g
+         class="edge"
+         id="edge27">
+        <title
+           id="title754">N19-&gt;N20</title>
+        <g
+           id="a_edge27">
+          <a
+             id="a760"
+             xlink:title="os.(*File).Readdirnames -&gt; os.(*File).readdir (0.14s)">
+            <path
+               id="path756"
+               d="m 630,-991.66 c 0,15.38 0,36.43 0,53.93"
+               stroke="#b2b0ab"
+               fill="none" />
+            <polygon
+               id="polygon758"
+               points="630,-927.81 626.5,-937.81 633.5,-937.81 "
+               stroke="#b2b0ab"
+               fill="#b2b0ab" />
+          </a>
+        </g>
+        <g
+           id="a_edge27-label">
+          <a
+             id="a765"
+             xlink:title="os.(*File).Readdirnames -&gt; os.(*File).readdir (0.14s)">
+            <text
+               id="text763"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-955.29999"
+               x="647"
+               text-anchor="middle">0.14s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N20&#45;&gt;N15 -->
+      <g
+         class="edge"
+         id="edge30">
+        <title
+           id="title769">N20-&gt;N15</title>
+        <g
+           id="a_edge30">
+          <a
+             id="a775"
+             xlink:title="os.(*File).readdir -&gt; internal/poll.(*FD).FindNextFile (0.13s)">
+            <path
+               id="path771"
+               d="m 630,-881.66 c 0,15.38 0,36.43 0,53.93"
+               stroke="#b2b1ac"
+               fill="none" />
+            <polygon
+               id="polygon773"
+               points="630,-817.81 626.5,-827.81 633.5,-827.81 "
+               stroke="#b2b1ac"
+               fill="#b2b1ac" />
+          </a>
+        </g>
+        <g
+           id="a_edge30-label">
+          <a
+             id="a780"
+             xlink:title="os.(*File).readdir -&gt; internal/poll.(*FD).FindNextFile (0.13s)">
+            <text
+               id="text778"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-845.29999"
+               x="647"
+               text-anchor="middle">0.13s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N23 -->
+      <g
+         class="node"
+         id="node23">
+        <title
+           id="title784">N23</title>
+        <g
+           id="a_node23">
+          <a
+             id="a794"
+             xlink:title="os.lstatNolog (2.42s)">
+            <polygon
+               id="polygon786"
+               points="776.5,-1032 689.5,-1032 689.5,-996 776.5,-996 "
+               stroke="#b2713b"
+               fill="#ede4dd" />
+            <text
+               id="text788"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1021.1"
+               x="733"
+               text-anchor="middle">os</text>
+            <text
+               id="text790"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1012.1"
+               x="733"
+               text-anchor="middle">lstatNolog</text>
+            <text
+               id="text792"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-1003.1"
+               x="733"
+               text-anchor="middle">0 of 2.42s (13.33%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N21&#45;&gt;N23 -->
+      <g
+         class="edge"
+         id="edge17">
+        <title
+           id="title798">N21-&gt;N23</title>
+        <g
+           id="a_edge17">
+          <a
+             id="a804"
+             xlink:title="os.Lstat -&gt; os.lstatNolog (2.42s)">
+            <path
+               id="path800"
+               d="m 717.14,-1101.83 c 2.9,15.89 7.27,39.79 10.68,58.5"
+               stroke="#b2713b"
+               fill="none" />
+            <polygon
+               id="polygon802"
+               points="729.59,-1033.69 724.35,-1042.9 731.23,-1044.15 "
+               stroke="#b2713b"
+               fill="#b2713b" />
+          </a>
+        </g>
+        <g
+           id="a_edge17-label">
+          <a
+             id="a811"
+             xlink:title="os.Lstat -&gt; os.lstatNolog (2.42s)">
+            <text
+               id="text807"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-1072.8"
+               x="746"
+               text-anchor="middle">2.42s</text>
+            <text
+               id="text809"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-1057.8"
+               x="746"
+               text-anchor="middle">(inline)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N22&#45;&gt;N8 -->
+      <g
+         class="edge"
+         id="edge9">
+        <title
+           id="title815">N22-&gt;N8</title>
+        <g
+           id="a_edge9">
+          <a
+             id="a821"
+             xlink:title="os.OpenFile -&gt; os.openFileNolog (15.16s)">
+            <path
+               id="path817"
+               d="m 486,-684.8 c 0,9.84 0,22.53 0,34.27"
+               stroke-width="5"
+               stroke="#b20900"
+               fill="none" />
+            <polygon
+               id="polygon819"
+               points="486,-640.7 481.63,-650.7 490.38,-650.7 "
+               stroke-width="5"
+               stroke="#b20900"
+               fill="#b20900" />
+          </a>
+        </g>
+        <g
+           id="a_edge9-label">
+          <a
+             id="a826"
+             xlink:title="os.OpenFile -&gt; os.openFileNolog (15.16s)">
+            <text
+               id="text824"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-655.79999"
+               x="506.5"
+               text-anchor="middle">15.16s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N24 -->
+      <g
+         class="node"
+         id="node24">
+        <title
+           id="title830">N24</title>
+        <g
+           id="a_node24">
+          <a
+             id="a840"
+             xlink:title="os.stat (2.42s)">
+            <polygon
+               id="polygon832"
+               points="776.5,-922 689.5,-922 689.5,-886 776.5,-886 "
+               stroke="#b2713b"
+               fill="#ede4dd" />
+            <text
+               id="text834"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-911.09998"
+               x="733"
+               text-anchor="middle">os</text>
+            <text
+               id="text836"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-902.09998"
+               x="733"
+               text-anchor="middle">stat</text>
+            <text
+               id="text838"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-893.09998"
+               x="733"
+               text-anchor="middle">0 of 2.42s (13.33%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N23&#45;&gt;N24 -->
+      <g
+         class="edge"
+         id="edge18">
+        <title
+           id="title844">N23-&gt;N24</title>
+        <g
+           id="a_edge18">
+          <a
+             id="a850"
+             xlink:title="os.lstatNolog -&gt; os.stat (2.42s)">
+            <path
+               id="path846"
+               d="m 733,-995.65 c 0,16.69 0,42.23 0,61.95"
+               stroke="#b2713b"
+               fill="none" />
+            <polygon
+               id="polygon848"
+               points="733,-923.82 729.5,-933.82 736.5,-933.82 "
+               stroke="#b2713b"
+               fill="#b2713b" />
+          </a>
+        </g>
+        <g
+           id="a_edge18-label">
+          <a
+             id="a855"
+             xlink:title="os.lstatNolog -&gt; os.stat (2.42s)">
+            <text
+               id="text853"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-955.29999"
+               x="750"
+               text-anchor="middle">2.42s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N28 -->
+      <g
+         class="node"
+         id="node28">
+        <title
+           id="title859">N28</title>
+        <g
+           id="a_node28">
+          <a
+             id="a869"
+             xlink:title="syscall.GetFileAttributesEx (2.40s)">
+            <polygon
+               id="polygon861"
+               points="776.5,-812 689.5,-812 689.5,-776 776.5,-776 "
+               stroke="#b2723c"
+               fill="#ede4dd" />
+            <text
+               id="text863"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-801.09998"
+               x="733"
+               text-anchor="middle">syscall</text>
+            <text
+               id="text865"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-792.09998"
+               x="733"
+               text-anchor="middle">GetFileAttributesEx</text>
+            <text
+               id="text867"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-783.09998"
+               x="733"
+               text-anchor="middle">0 of 2.40s (13.22%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N24&#45;&gt;N28 -->
+      <g
+         class="edge"
+         id="edge20">
+        <title
+           id="title873">N24-&gt;N28</title>
+        <g
+           id="a_edge20">
+          <a
+             id="a879"
+             xlink:title="os.stat -&gt; syscall.GetFileAttributesEx (2.40s)">
+            <path
+               id="path875"
+               d="m 733,-885.65 c 0,16.69 0,42.23 0,61.95"
+               stroke="#b2723c"
+               fill="none" />
+            <polygon
+               id="polygon877"
+               points="733,-813.82 729.5,-823.82 736.5,-823.82 "
+               stroke="#b2723c"
+               fill="#b2723c" />
+          </a>
+        </g>
+        <g
+           id="a_edge20-label">
+          <a
+             id="a884"
+             xlink:title="os.stat -&gt; syscall.GetFileAttributesEx (2.40s)">
+            <text
+               id="text882"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-845.29999"
+               x="750"
+               text-anchor="middle">2.40s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N25&#45;&gt;N4 -->
+      <g
+         class="edge"
+         id="edge2">
+        <title
+           id="title888">N25-&gt;N4</title>
+        <g
+           id="a_edge2">
+          <a
+             id="a894"
+             xlink:title="path/filepath.Walk -&gt; path/filepath.walk (18.07s)">
+            <path
+               id="path890"
+               d="m 486,-1275.8 c 0,9.84 0,22.53 0,34.27"
+               stroke-width="5"
+               stroke="#b20000"
+               fill="none" />
+            <polygon
+               id="polygon892"
+               points="486,-1231.7 481.63,-1241.7 490.38,-1241.7 "
+               stroke-width="5"
+               stroke="#b20000"
+               fill="#b20000" />
+          </a>
+        </g>
+        <g
+           id="a_edge2-label">
+          <a
+             id="a899"
+             xlink:title="path/filepath.Walk -&gt; path/filepath.walk (18.07s)">
+            <text
+               id="text897"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-1246.8"
+               x="506.5"
+               text-anchor="middle">18.07s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N26 -->
+      <g
+         class="node"
+         id="node26">
+        <title
+           id="title903">N26</title>
+        <g
+           id="a_node26">
+          <a
+             id="a913"
+             xlink:title="syscall.CreateFile (15.03s)">
+            <polygon
+               id="polygon905"
+               points="532,-373 440,-373 440,-337 532,-337 "
+               stroke="#b20900"
+               fill="#edd6d5" />
+            <text
+               id="text907"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-362.10001"
+               x="486"
+               text-anchor="middle">syscall</text>
+            <text
+               id="text909"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-353.10001"
+               x="486"
+               text-anchor="middle">CreateFile</text>
+            <text
+               id="text911"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-344.10001"
+               x="486"
+               text-anchor="middle">0 of 15.03s (82.76%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N31 -->
+      <g
+         class="node"
+         id="node31">
+        <title
+           id="title917">N31</title>
+        <g
+           id="a_node31">
+          <a
+             id="a927"
+             xlink:title="syscall.Syscall9 (15.03s)">
+            <polygon
+               id="polygon919"
+               points="532,-286 440,-286 440,-250 532,-250 "
+               stroke="#b20900"
+               fill="#edd6d5" />
+            <text
+               id="text921"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-275.10001"
+               x="486"
+               text-anchor="middle">syscall</text>
+            <text
+               id="text923"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-266.10001"
+               x="486"
+               text-anchor="middle">Syscall9</text>
+            <text
+               id="text925"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-257.10001"
+               x="486"
+               text-anchor="middle">0 of 15.03s (82.76%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N26&#45;&gt;N31 -->
+      <g
+         class="edge"
+         id="edge13">
+        <title
+           id="title931">N26-&gt;N31</title>
+        <g
+           id="a_edge13">
+          <a
+             id="a937"
+             xlink:title="syscall.CreateFile -&gt; syscall.Syscall9 (15.03s)">
+            <path
+               id="path933"
+               d="m 486,-336.8 c 0,9.84 0,22.53 0,34.27"
+               stroke-width="5"
+               stroke="#b20900"
+               fill="none" />
+            <polygon
+               id="polygon935"
+               points="486,-292.7 481.63,-302.7 490.38,-302.7 "
+               stroke-width="5"
+               stroke="#b20900"
+               fill="#b20900" />
+          </a>
+        </g>
+        <g
+           id="a_edge13-label">
+          <a
+             id="a942"
+             xlink:title="syscall.CreateFile -&gt; syscall.Syscall9 (15.03s)">
+            <text
+               id="text940"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-307.79999"
+               x="506.5"
+               text-anchor="middle">15.03s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N32 -->
+      <g
+         class="node"
+         id="node32">
+        <title
+           id="title946">N32</title>
+        <g
+           id="a_node32">
+          <a
+             id="a956"
+             xlink:title="syscall.findNextFile1 (0.13s)">
+            <polygon
+               id="polygon948"
+               points="684.5,-634 601.5,-634 601.5,-598 684.5,-598 "
+               stroke="#b2b1ac"
+               fill="#edecec" />
+            <text
+               id="text950"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-623.09998"
+               x="643"
+               text-anchor="middle">syscall</text>
+            <text
+               id="text952"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-614.09998"
+               x="643"
+               text-anchor="middle">findNextFile1</text>
+            <text
+               id="text954"
+               font-size="8px"
+               font-family="'Times New Roman', serif"
+               y="-605.09998"
+               x="643"
+               text-anchor="middle">0 of 0.13s (0.72%)</text>
+          </a>
+        </g>
+      </g>
+      <!-- N27&#45;&gt;N32 -->
+      <g
+         class="edge"
+         id="edge31">
+        <title
+           id="title960">N27-&gt;N32</title>
+        <g
+           id="a_edge31">
+          <a
+             id="a966"
+             xlink:title="syscall.FindNextFile -&gt; syscall.findNextFile1 (0.13s)">
+            <path
+               id="path962"
+               d="m 636.62,-684.8 c 1.05,11.22 2.46,26.13 3.68,39.11"
+               stroke="#b2b1ac"
+               fill="none" />
+            <polygon
+               id="polygon964"
+               points="641.21,-635.97 636.79,-645.6 643.76,-646.26 "
+               stroke="#b2b1ac"
+               fill="#b2b1ac" />
+          </a>
+        </g>
+        <g
+           id="a_edge31-label">
+          <a
+             id="a971"
+             xlink:title="syscall.FindNextFile -&gt; syscall.findNextFile1 (0.13s)">
+            <text
+               id="text969"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-655.79999"
+               x="656"
+               text-anchor="middle">0.13s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N28&#45;&gt;N5 -->
+      <g
+         class="edge"
+         id="edge21">
+        <title
+           id="title975">N28-&gt;N5</title>
+        <g
+           id="a_edge21">
+          <a
+             id="a981"
+             xlink:title="syscall.GetFileAttributesEx -&gt; syscall.Syscall (2.40s)">
+            <path
+               id="path977"
+               d="m 733,-775.61 c 0,17.95 0,46.73 0,71.61 0,0 0,0 0,176 0,41.37 -45.37,63.21 -84.26,74.34"
+               stroke="#b2723c"
+               fill="none" />
+            <polygon
+               id="polygon979"
+               points="639.44,-451.19 648.21,-457.14 650.01,-450.38 "
+               stroke="#b2723c"
+               fill="#b2723c" />
+          </a>
+        </g>
+        <g
+           id="a_edge21-label">
+          <a
+             id="a986"
+             xlink:title="syscall.GetFileAttributesEx -&gt; syscall.Syscall (2.40s)">
+            <text
+               id="text984"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-612.29999"
+               x="750"
+               text-anchor="middle">2.40s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N29&#45;&gt;N5 -->
+      <g
+         class="edge"
+         id="edge26">
+        <title
+           id="title990">N29-&gt;N5</title>
+        <g
+           id="a_edge26">
+          <a
+             id="a996"
+             xlink:title="syscall.GetFileInformationByHandle -&gt; syscall.Syscall (0.15s)">
+            <path
+               id="path992"
+               d="m 364.19,-597.6 c 2.46,22.73 9.95,62.46 32.81,86.6 44.32,46.79 75.86,32.44 142.12,50.64"
+               stroke="#b2b0ab"
+               fill="none" />
+            <polygon
+               id="polygon994"
+               points="548.6,-457.58 538.02,-457.04 540,-463.75 "
+               stroke="#b2b0ab"
+               fill="#b2b0ab" />
+          </a>
+        </g>
+        <g
+           id="a_edge26-label">
+          <a
+             id="a1001"
+             xlink:title="syscall.GetFileInformationByHandle -&gt; syscall.Syscall (0.15s)">
+            <text
+               id="text999"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-525.29999"
+               x="414"
+               text-anchor="middle">0.15s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N30&#45;&gt;N26 -->
+      <g
+         class="edge"
+         id="edge14">
+        <title
+           id="title1005">N30-&gt;N26</title>
+        <g
+           id="a_edge14">
+          <a
+             id="a1011"
+             xlink:title="syscall.Open -&gt; syscall.CreateFile (15.03s)">
+            <path
+               id="path1007"
+               d="m 486,-423.8 c 0,9.84 0,22.53 0,34.27"
+               stroke-width="5"
+               stroke="#b20900"
+               fill="none" />
+            <polygon
+               id="polygon1009"
+               points="486,-379.7 481.63,-389.7 490.38,-389.7 "
+               stroke-width="5"
+               stroke="#b20900"
+               fill="#b20900" />
+          </a>
+        </g>
+        <g
+           id="a_edge14-label">
+          <a
+             id="a1016"
+             xlink:title="syscall.Open -&gt; syscall.CreateFile (15.03s)">
+            <text
+               id="text1014"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-394.79999"
+               x="506.5"
+               text-anchor="middle">15.03s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N31&#45;&gt;N3 -->
+      <g
+         class="edge"
+         id="edge15">
+        <title
+           id="title1020">N31-&gt;N3</title>
+        <g
+           id="a_edge15">
+          <a
+             id="a1026"
+             xlink:title="syscall.Syscall9 -&gt; syscall.SyscallN (15.03s)">
+            <path
+               id="path1022"
+               d="m 486,-249.8 c 0,9.84 0,22.53 0,34.27"
+               stroke-width="5"
+               stroke="#b20900"
+               fill="none" />
+            <polygon
+               id="polygon1024"
+               points="486,-205.7 481.63,-215.7 490.38,-215.7 "
+               stroke-width="5"
+               stroke="#b20900"
+               fill="#b20900" />
+          </a>
+        </g>
+        <g
+           id="a_edge15-label">
+          <a
+             id="a1031"
+             xlink:title="syscall.Syscall9 -&gt; syscall.SyscallN (15.03s)">
+            <text
+               id="text1029"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-220.8"
+               x="506.5"
+               text-anchor="middle">15.03s</text>
+          </a>
+        </g>
+      </g>
+      <!-- N32&#45;&gt;N5 -->
+      <g
+         class="edge"
+         id="edge32">
+        <title
+           id="title1035">N32-&gt;N5</title>
+        <g
+           id="a_edge32">
+          <a
+             id="a1041"
+             xlink:title="syscall.findNextFile1 -&gt; syscall.Syscall (0.13s)">
+            <path
+               id="path1037"
+               d="m 646.34,-597.75 c 4.37,27.72 8.9,82.83 -15.34,119.75 -2.15,3.28 -4.67,6.47 -7.36,9.51"
+               stroke="#b2b1ac"
+               fill="none" />
+            <polygon
+               id="polygon1039"
+               points="616.81,-461.48 621.28,-471.09 626.3,-466.2 "
+               stroke="#b2b1ac"
+               fill="#b2b1ac" />
+          </a>
+        </g>
+        <g
+           id="a_edge32-label">
+          <a
+             id="a1046"
+             xlink:title="syscall.findNextFile1 -&gt; syscall.Syscall (0.13s)">
+            <text
+               id="text1044"
+               font-size="14px"
+               font-family="'Times New Roman', serif"
+               y="-525.29999"
+               x="666"
+               text-anchor="middle">0.13s</text>
+          </a>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>

@@ -12,6 +12,8 @@ import (
 	"strings"
 )
 
+// ** Use a map instead of struct, then make the To values to be a slice to get all the posible remitents
+// ** Use an Emails proccess library like mail or go-imap to optimize the data reading
 type Email struct {
 	MessageID string
 	From      string
@@ -32,7 +34,7 @@ func main() {
 	if err != nil {
 		fmt.Printf("error walking the path %q: %v\n", root, err)
 	}
-
+	// **Rebuild the way to call bulk in order to bulk info every 64 items and clean the Mails slice
 	bulkEmails()
 
 }
@@ -61,6 +63,7 @@ func appendInfo(path string) {
 	var To string
 	var Subject string
 	var Content string
+	// **Use strings.splitafter(`\r\n`) to optimize the splitting proccess
 	for _, line := range lines {
 		key, obj := asignLine(line)
 		if key != "" {
@@ -85,6 +88,9 @@ func appendInfo(path string) {
 	pushData(createMail(MessageID, From, To, Subject, Content))
 }
 
+// ** Use a map structure to avoid using switch
+// ** Use stringsTrimSpace to take out the blank spaces
+// ** Use strings.Index() to find the `:` and the use the index to exteract the values
 func asignLine(line string) (string, string) {
 	var key string
 	var obj string

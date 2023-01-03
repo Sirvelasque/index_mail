@@ -14,6 +14,8 @@ import (
 
 // ** Use a map instead of struct, then make the To values to be a slice to get all the posible remitents
 // ** Use an Emails proccess library like mail or go-imap to optimize the data reading
+// ** Paralize the the process with goroutines
+// ** Analyze data with boyer-moore algorithm
 type Email struct {
 	MessageID string
 	From      string

@@ -9,11 +9,18 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
 )
 
 func main() {
 	fmt.Println("starting server...")
 	router := chi.NewRouter()
+
+	router.Use(cors.New(cors.Options{
+		AllowedOrigins:   []string{"http://localhost:5173"},
+		AllowCredentials: true,
+		Debug:            true,
+	}).Handler)
 	router.Get("/search", searchHandler)
 	http.ListenAndServe(":8080", router)
 

@@ -30,7 +30,7 @@ func main() {
 	go func() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
-	fmt.Println("working")
+
 	root := os.Args[1]
 	err := filepath.Walk(root, visit)
 	if err != nil {

@@ -1,4 +1,4 @@
-# index_mail
+# Index mail
 
 > Here you get an app to index Emails into a Zincsearch database and look for them in a simple interfase with a search engine
 

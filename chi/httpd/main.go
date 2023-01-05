@@ -20,7 +20,8 @@ func main() {
 }
 
 func searchHandler(w http.ResponseWriter, r *http.Request) {
-	json.NewEncoder(w).Encode(search("pallen"))
+	key := r.URL.Query().Get("key")
+	json.NewEncoder(w).Encode(string(search(key)))
 }
 
 func search(key string) []byte {

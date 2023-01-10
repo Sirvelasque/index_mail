@@ -45,11 +45,23 @@
       </button>
     </div>
   </form>
-  <!-- <ul>
-      <li v-for="item in result" :key="item.id">
-        {{ item.name }} - {{ item.email }}
-      </li>
-  </ul> -->
+  <table>
+    <thead>
+      <tr>
+        <th>Subject</th>
+        <th>From</th>
+        <th>To</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr v-for="item in result" :key="item.id" @click="selectedContent = item.content">
+        <td>{{ item.subject }}</td>
+        <td>{{ item.from }}</td>
+        <td>{{ item.to }}</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>Contenido seleccionado: {{ selectedContent }}</p>
 </template>
 
 <script>
@@ -59,6 +71,7 @@ export default {
     return {
       key: '',
       result: [],
+      selectedContent: '',
     };
   },
   methods: {
@@ -76,6 +89,9 @@ export default {
   .catch((error) => {
     // Manejar el error
   });
+    },
+    handleClick(item) {
+      this.selectedContent = item.content;
     },
   },
 };

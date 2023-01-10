@@ -1,8 +1,10 @@
-
-
 <template>
+  <header>
+    <div class="bg-rose-500 shadow-md rounded px-8 pt-6 pb-8 mb-4"></div>
+  </header>
+  <section id="app_container">
   <form
-    class="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4"
+    class="bg-rose-500 shadow-md rounded px-8 pt-6 pb-8 mb-4"
     @submit="handleSubmit"
   >
     <div class="mb-4">
@@ -41,11 +43,14 @@
         "
         type="submit"
       >
-        Enviar
+        Buscar
       </button>
     </div>
   </form>
-  <table>
+
+  <!-- content table -->
+  <div>
+  <table id="list_table">
     <thead>
       <tr>
         <th>Subject</th>
@@ -61,7 +66,11 @@
       </tr>
     </tbody>
   </table>
-  <p>Contenido seleccionado: {{ selectedContent }}</p>
+  <div class="content">
+    <p v-html="selectedContent"></p>
+  </div>
+</div>
+</section>
 </template>
 
 <script>

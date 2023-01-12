@@ -12,6 +12,14 @@ import (
 	"github.com/go-chi/cors"
 )
 
+type Email struct {
+	MessageID string `json:"message_id"`
+	From      string `json:"from"`
+	To        string `json:"to"`
+	Subject   string `json:"subject"`
+	Content   string `json:"content"`
+}
+
 func main() {
 	fmt.Println("starting server...")
 	router := chi.NewRouter()
@@ -28,7 +36,30 @@ func main() {
 
 func searchHandler(w http.ResponseWriter, r *http.Request) {
 	key := r.URL.Query().Get("key")
-	json.NewEncoder(w).Encode(string(search(key)))
+	data := search(key)
+	var result map[string]interface{}
+	json.Unmarshal(data, &result)
+
+	emails := make([]Email, 0)
+	hits := result["hits"].(map[string]interface{})
+	for _, hit := range hits["hits"].([]interface{}) {
+		hitMap := hit.(map[string]interface{})
+		source := hitMap["_source"].(map[string]interface{})
+		emails = append(emails, Email{
+			MessageID: source["MessageID"].(string),
+			From:      source["From"].(string),
+			To:        source["To"].(string),
+			Subject:   source["Subject"].(string),
+			Content:   source["Content"].(string),
+		})
+	}
+	fmt.Println("hits----------------")
+	fmt.Print(hits)
+	fmt.Println("hits-----------------")
+	fmt.Println("emails----------------")
+	fmt.Print(emails)
+	fmt.Println("emails-----------------")
+	json.NewEncoder(w).Encode(emails)
 }
 
 func search(key string) []byte {
@@ -49,7 +80,6 @@ func search(key string) []byte {
 	}
 	req.SetBasicAuth("admin", "Complexpass#123")
 	req.Header.Set("Content-Type", "application/json")
-	// req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
